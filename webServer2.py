@@ -54,7 +54,8 @@ class WSGIServer(object):
     def parse_request(self, text):
         request_line = text.splitlines()[0]
         request_line = request_line.rstrip("\r\n")
-        (self.request_method, self.request_path, self.version) = request_line.split()
+        (self.request_method, self.request_path,
+         self.version) = request_line.split()
 
     def get_environ(self):
         env = {}
