@@ -3,9 +3,13 @@ from pyramid.response import Response
 
 
 def hello_world(request):
-    return Response("Hello Aliens from Pyramid!\n", content_type="text/plain",)
+    return Response(
+        "Hello Aliens from Pyramid!\n",
+        content_type="text/plain",
+    )
+
 
 config = Configurator()
-config.add_route('hello', '/hello')
-config.add_view(hello_world, route_name='hello')
+config.add_route("hello", "/hello")
+config.add_view(hello_world, route_name="hello")
 app = config.make_wsgi_app()

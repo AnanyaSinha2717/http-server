@@ -1,18 +1,17 @@
-import os
 import io
 import socket
 import sys
-from email.utils import format_datetime
+from email.utils import formatdate
 
 
-class WSGISERVER(object):
+class WSGIServer(object):
     address_family = socket.AF_INET
     socket_type = socket.SOCK_STREAM
     request_queue_size = 1
 
     # creating a listening socket
     def __init__(self, server_address):
-        socket.listen_socket = listen_socket = socket.socket(
+        self.listen_socket = listen_socket = socket.socket(
             self.address_family, self.socket_type
         )
         # reuse the same address
@@ -21,6 +20,9 @@ class WSGISERVER(object):
         listen_socket.bind(server_address)
         # enable server to accept connections
         listen_socket.listen(self.request_queue_size)
+        host, port = self.listen_socket.getsockname()[:2]
+        self.server_name = socket.getfqdn(host)
+        self.server_port = port
         # return headers
         self.header_set = []
 
@@ -38,8 +40,8 @@ class WSGISERVER(object):
         request_data = self.client_conn.recv(1024)
 
         # byte to str
-        request_data: str = request_data.decode("utf-8")
-        self.request_data = request_data
+        # request_data: str = request_data.decode("utf-8")
+        self.request_data = request_data = request_data.decode("utf-8")
 
         print("".join(f"<{line}\n" for line in request_data.splitlines()))
 
@@ -51,7 +53,7 @@ class WSGISERVER(object):
 
     def parse_request(self, text):
         request_line = text.splitlines()[0]
-        request_line = text.rstrip("\r\n")
+        request_line = request_line.rstrip("\r\n")
         (self.request_method, self.request_path, self.version) = request_line.split()
 
     def get_environ(self):
@@ -64,16 +66,17 @@ class WSGISERVER(object):
         env["wsgi.multithread"] = False
         env["wsgi.multiprocess"] = False
         env["wsgi.run_once"] = False
-        env["wsgi.REQUEST_METHOD"] = self.request_method
-        env["wsgi.REQUEST_PATH"] = self.request_path
-        env["wsgi.SERVER_NAME"] = self.server_name
-        env["wsgi.SERVER_PORT"] = str(self.server_port)
+        # CGI variables
+        env["REQUEST_METHOD"] = self.request_method
+        env["PATH_INFO"] = self.request_path
+        env["SERVER_NAME"] = self.server_name
+        env["SERVER_PORT"] = str(self.server_port)
         return env
 
     def start_response(self, status, response_headers, exc_info=None):
         server_headers = [
-            ("Date", format_datetime),
-            ("Server_Name", "WSGIServer 0.2"),
+            ("Date", str(formatdate(usegmt=True))),
+            ("Server", "WSGIServer 0.2"),
         ]
         self.header_set = [status, response_headers + server_headers]
 
@@ -98,18 +101,18 @@ SERVER_ADDRESS = (HOST, PORT) = "", 8888
 
 
 def make_server(server_address, application):
-    server = WSGISERVER(server_address)
+    server = WSGIServer(server_address)
     server.set_app(application)
     return server
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Provide a WSGI application object as module: callable")
+        sys.exit("Provide a WSGI application object as module: callable")
     app_path = sys.argv[1]
-    module, application = app_path.split()
+    module, application = app_path.split(":")
     module = __import__(module)
     application = getattr(module, application)
     httpd = make_server(SERVER_ADDRESS, application)
-    print("WSGIServer: Serving HTTP on port {PORT}...\n")
+    print(f"WSGIServer: Serving HTTP on port {PORT}...\n")
     httpd.serve_forever()
